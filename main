@@ -1,0 +1,549 @@
+--// Preventing Multiple Processes
+
+pcall(function()
+    getgenv().Aimbot.Functions:Exit()
+end)
+
+--// Environment
+
+getgenv().Aimbot = {}
+local Environment = getgenv().Aimbot
+
+--// Services
+
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
+local StarterGui = game:GetService("StarterGui")
+local Players = game:GetService("Players")
+local Camera = game:GetService("Workspace").CurrentCamera
+
+--// Variables
+
+local LocalPlayer = Players.LocalPlayer
+local Title = "aim.cuh"
+local FileNames = {"Aimbot", "Configuration.json", "Drawing.json"}
+local Typing, Running, Animation, RequiredDistance, ServiceConnections = false, false, nil, 2000, {}
+
+--// Support Functions
+
+local mousemoverel = mousemoverel or (Input and Input.MouseMove)
+local queueonteleport = queue_on_teleport or syn.queue_on_teleport
+
+--// GUI Creation
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local TitleBar = Instance.new("Frame")
+local TitleText = Instance.new("TextLabel")
+local ToggleButton = Instance.new("TextButton")
+local FOVSlider = Instance.new("Frame")
+local FOVValue = Instance.new("TextLabel")
+local FOVSliderBar = Instance.new("TextButton")
+local FOVSliderFill = Instance.new("Frame")
+local TeamCheckToggle = Instance.new("TextButton")
+local WallCheckToggle = Instance.new("TextButton")
+local KeybindButton = Instance.new("TextButton")
+
+-- GUI Setup
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.Name = "AimCuhGUI"
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BorderColor3 = Color3.fromRGB(255, 0, 0)
+MainFrame.BorderSizePixel = 2
+MainFrame.Position = UDim2.new(0.8, 0, 0.3, 0)
+MainFrame.Size = UDim2.new(0, 220, 0, 300) -- Increased height
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+TitleBar.Name = "TitleBar"
+TitleBar.Parent = MainFrame
+TitleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+TitleBar.BorderColor3 = Color3.fromRGB(255, 0, 0)
+TitleBar.BorderSizePixel = 1
+TitleBar.Size = UDim2.new(1, 0, 0, 35)
+
+TitleText.Name = "TitleText"
+TitleText.Parent = TitleBar
+TitleText.BackgroundTransparency = 1
+TitleText.Size = UDim2.new(1, 0, 1, 0)
+TitleText.Font = Enum.Font.GothamBold
+TitleText.Text = "aim.cuh"
+TitleText.TextColor3 = Color3.fromRGB(255, 0, 0)
+TitleText.TextSize = 20
+
+ToggleButton.Name = "ToggleButton"
+ToggleButton.Parent = MainFrame
+ToggleButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+ToggleButton.BorderColor3 = Color3.fromRGB(255, 0, 0)
+ToggleButton.Position = UDim2.new(0.1, 0, 0.2, 0) -- Adjusted position
+ToggleButton.Size = UDim2.new(0.8, 0, 0, 35)
+ToggleButton.Font = Enum.Font.GothamBold
+ToggleButton.Text = "Enabled: OFF"
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.TextSize = 16
+
+-- Add toggle functionality
+local enabled = false
+ToggleButton.MouseButton1Click:Connect(function()
+    enabled = not enabled
+    ToggleButton.Text = "Enabled: " .. (enabled and "ON" or "OFF")
+    Environment.Settings.Enabled = enabled
+end)
+
+FOVSlider.Name = "FOVSlider"
+FOVSlider.Parent = MainFrame
+FOVSlider.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+FOVSlider.BorderColor3 = Color3.fromRGB(255, 0, 0)
+FOVSlider.Position = UDim2.new(0.1, 0, 0.35, 0) -- Adjusted position
+FOVSlider.Size = UDim2.new(0.8, 0, 0, 40)
+
+FOVValue.Name = "FOVValue"
+FOVValue.Parent = FOVSlider
+FOVValue.BackgroundTransparency = 1
+FOVValue.Size = UDim2.new(1, 0, 0.5, 0)
+FOVValue.Font = Enum.Font.GothamBold
+FOVValue.Text = "FOV: 90"
+FOVValue.TextColor3 = Color3.fromRGB(255, 255, 255)
+FOVValue.TextSize = 14
+
+FOVSliderBar.Name = "FOVSliderBar"
+FOVSliderBar.Parent = FOVSlider
+FOVSliderBar.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+FOVSliderBar.BorderColor3 = Color3.fromRGB(255, 0, 0)
+FOVSliderBar.Position = UDim2.new(0, 0, 0.6, 0)
+FOVSliderBar.Size = UDim2.new(1, 0, 0.3, 0)
+FOVSliderBar.Text = ""
+
+FOVSliderFill.Name = "FOVSliderFill"
+FOVSliderFill.Parent = FOVSliderBar
+FOVSliderFill.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+FOVSliderFill.BorderSizePixel = 0
+FOVSliderFill.Size = UDim2.new(0.5, 0, 1, 0)
+
+TeamCheckToggle.Name = "TeamCheckToggle"
+TeamCheckToggle.Parent = MainFrame
+TeamCheckToggle.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+TeamCheckToggle.BorderColor3 = Color3.fromRGB(255, 0, 0)
+TeamCheckToggle.Position = UDim2.new(0.1, 0, 0.55, 0) -- Adjusted position
+TeamCheckToggle.Size = UDim2.new(0.8, 0, 0, 35)
+TeamCheckToggle.Font = Enum.Font.GothamBold
+TeamCheckToggle.Text = "Team Check: OFF"
+TeamCheckToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+TeamCheckToggle.TextSize = 14
+
+-- Add team check toggle functionality
+local teamCheckEnabled = false
+TeamCheckToggle.MouseButton1Click:Connect(function()
+    teamCheckEnabled = not teamCheckEnabled
+    TeamCheckToggle.Text = "Team Check: " .. (teamCheckEnabled and "ON" or "OFF")
+    Environment.Settings.TeamCheck = teamCheckEnabled
+end)
+
+WallCheckToggle.Name = "WallCheckToggle"
+WallCheckToggle.Parent = MainFrame
+WallCheckToggle.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+WallCheckToggle.BorderColor3 = Color3.fromRGB(255, 0, 0)
+WallCheckToggle.Position = UDim2.new(0.1, 0, 0.7, 0) -- Adjusted position
+WallCheckToggle.Size = UDim2.new(0.8, 0, 0, 35)
+WallCheckToggle.Font = Enum.Font.GothamBold
+WallCheckToggle.Text = "Wall Check: OFF"
+WallCheckToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+WallCheckToggle.TextSize = 14
+
+-- Add wall check toggle functionality
+local wallCheckEnabled = false
+WallCheckToggle.MouseButton1Click:Connect(function()
+    wallCheckEnabled = not wallCheckEnabled
+    WallCheckToggle.Text = "Wall Check: " .. (wallCheckEnabled and "ON" or "OFF")
+    Environment.Settings.WallCheck = wallCheckEnabled
+end)
+
+KeybindButton.Name = "KeybindButton"
+KeybindButton.Parent = MainFrame
+KeybindButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+KeybindButton.BorderColor3 = Color3.fromRGB(255, 0, 0)
+KeybindButton.Position = UDim2.new(0.1, 0, 0.85, 0) -- Adjusted position
+KeybindButton.Size = UDim2.new(0.8, 0, 0, 35)
+KeybindButton.Font = Enum.Font.GothamBold
+KeybindButton.Text = "Keybind: Right Click"
+KeybindButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+KeybindButton.TextSize = 14
+
+-- Add keybind functionality
+local changingKeybind = false
+
+KeybindButton.MouseButton1Click:Connect(function()
+    if not changingKeybind then
+        changingKeybind = true
+        KeybindButton.Text = "Press any key..."
+        
+        local connection
+        connection = UserInputService.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Keyboard then
+                Environment.Settings.TriggerKey = input.KeyCode.Name
+                KeybindButton.Text = "Keybind: " .. input.KeyCode.Name
+                changingKeybind = false
+                connection:Disconnect()
+            elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+                Environment.Settings.TriggerKey = "Left Click"
+                KeybindButton.Text = "Keybind: Left Click"
+                changingKeybind = false
+                connection:Disconnect()
+            elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+                Environment.Settings.TriggerKey = "Right Click" 
+                KeybindButton.Text = "Keybind: Right Click"
+                changingKeybind = false
+                connection:Disconnect()
+            elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
+                Environment.Settings.TriggerKey = "Middle Click"
+                KeybindButton.Text = "Keybind: Middle Click"
+                changingKeybind = false
+                connection:Disconnect()
+            end
+        end)
+    end
+end)
+
+-- Add RightShift to toggle UI visibility
+UserInputService.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        MainFrame.Visible = not MainFrame.Visible
+    end
+end)
+
+--// Script Settings
+
+Environment.Settings = {
+    SendNotifications = true,
+    SaveSettings = true,
+    ReloadOnTeleport = true,
+    Enabled = true,
+    TeamCheck = false,
+    AliveCheck = true,
+    WallCheck = false,
+    Sensitivity = 0,
+    ThirdPerson = false,
+    ThirdPersonSensitivity = 3,
+    TriggerKey = "MouseButton2",
+    Toggle = false,
+    LockPart = "Head"
+}
+
+Environment.FOVSettings = {
+    Enabled = true,
+    Visible = true,
+    Amount = 90,
+    Color = "255, 255, 255",
+    LockedColor = "255, 70, 70",
+    Transparency = 0.5,
+    Sides = 60,
+    Thickness = 1,
+    Filled = false
+}
+
+Environment.FOVCircle = Drawing.new("Circle")
+Environment.Locked = nil
+
+--// Core Functions
+
+local function Encode(Table)
+    if Table and type(Table) == "table" then
+        local EncodedTable = HttpService:JSONEncode(Table)
+        return EncodedTable
+    end
+end
+
+local function Decode(String)
+    if String and type(String) == "string" then
+        local DecodedTable = HttpService:JSONDecode(String)
+        return DecodedTable
+    end
+end
+
+local function GetColor(Color)
+    local R = tonumber(string.match(Color, "([%d]+)[%s]*,[%s]*[%d]+[%s]*,[%s]*[%d]+"))
+    local G = tonumber(string.match(Color, "[%d]+[%s]*,[%s]*([%d]+)[%s]*,[%s]*[%d]+"))
+    local B = tonumber(string.match(Color, "[%d]+[%s]*,[%s]*[%d]+[%s]*,[%s]*([%d]+)"))
+    return Color3.fromRGB(R, G, B)
+end
+
+local function SendNotification(TitleArg, DescriptionArg, DurationArg)
+    if Environment.Settings.SendNotifications then
+        StarterGui:SetCore("SendNotification", {
+            Title = TitleArg,
+            Text = DescriptionArg,
+            Duration = DurationArg
+        })
+    end
+end
+
+--// Functions
+
+local function SaveSettings()
+    if Environment.Settings.SaveSettings then
+        if isfile(Title.."/"..FileNames[1].."/"..FileNames[2]) then
+            writefile(Title.."/"..FileNames[1].."/"..FileNames[2], Encode(Environment.Settings))
+        end
+
+        if isfile(Title.."/"..FileNames[1].."/"..FileNames[3]) then
+            writefile(Title.."/"..FileNames[1].."/"..FileNames[3], Encode(Environment.FOVSettings))
+        end
+    end
+end
+
+local function GetClosestPlayer()
+    if not Environment.Locked then
+        if Environment.FOVSettings.Enabled then
+            RequiredDistance = Environment.FOVSettings.Amount
+        else
+            RequiredDistance = 2000
+        end
+
+        for _, v in next, Players:GetPlayers() do
+            if v ~= LocalPlayer then
+                if v.Character and v.Character:FindFirstChild(Environment.Settings.LockPart) and v.Character:FindFirstChildOfClass("Humanoid") then
+                    if Environment.Settings.TeamCheck and v.Team == LocalPlayer.Team then continue end
+                    if Environment.Settings.AliveCheck and v.Character:FindFirstChildOfClass("Humanoid").Health <= 0 then continue end
+                    if Environment.Settings.WallCheck and #(Camera:GetPartsObscuringTarget({v.Character[Environment.Settings.LockPart].Position}, v.Character:GetDescendants())) > 0 then continue end
+
+                    local Vector, OnScreen = Camera:WorldToViewportPoint(v.Character[Environment.Settings.LockPart].Position)
+                    local Distance = (Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y) - Vector2.new(Vector.X, Vector.Y)).Magnitude
+
+                    if Distance < RequiredDistance and OnScreen then
+                        RequiredDistance = Distance
+                        Environment.Locked = v
+                    end
+                end
+            end
+        end
+    elseif (Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y) - Vector2.new(Camera:WorldToViewportPoint(Environment.Locked.Character[Environment.Settings.LockPart].Position).X, Camera:WorldToViewportPoint(Environment.Locked.Character[Environment.Settings.LockPart].Position).Y)).Magnitude > RequiredDistance then
+        Environment.Locked = nil
+        Animation:Cancel()
+        Environment.FOVCircle.Color = GetColor(Environment.FOVSettings.Color)
+    end
+end
+
+--// Typing Check
+
+ServiceConnections.TypingStartedConnection = UserInputService.TextBoxFocused:Connect(function()
+    Typing = true
+end)
+
+ServiceConnections.TypingEndedConnection = UserInputService.TextBoxFocusReleased:Connect(function()
+    Typing = false
+end)
+
+--// Create, Save & Load Settings
+
+if Environment.Settings.SaveSettings then
+    if not isfolder(Title) then
+        makefolder(Title)
+    end
+
+    if not isfolder(Title.."/"..FileNames[1]) then
+        makefolder(Title.."/"..FileNames[1])
+    end
+
+    if not isfile(Title.."/"..FileNames[1].."/"..FileNames[2]) then
+        writefile(Title.."/"..FileNames[1].."/"..FileNames[2], Encode(Environment.Settings))
+    else
+        Environment.Settings = Decode(readfile(Title.."/"..FileNames[1].."/"..FileNames[2]))
+    end
+
+    if not isfile(Title.."/"..FileNames[1].."/"..FileNames[3]) then
+        writefile(Title.."/"..FileNames[1].."/"..FileNames[3], Encode(Environment.FOVSettings))
+    else
+        Environment.Visuals = Decode(readfile(Title.."/"..FileNames[1].."/"..FileNames[3]))
+    end
+
+    coroutine.wrap(function()
+        while wait(10) and Environment.Settings.SaveSettings do
+            SaveSettings()
+        end
+    end)()
+else
+    if isfolder(Title) then
+        delfolder(Title)
+    end
+end
+
+local function Load()
+    ServiceConnections.RenderSteppedConnection = RunService.RenderStepped:Connect(function()
+        if Environment.FOVSettings.Enabled and Environment.Settings.Enabled then
+            Environment.FOVCircle.Radius = Environment.FOVSettings.Amount
+            Environment.FOVCircle.Thickness = Environment.FOVSettings.Thickness
+            Environment.FOVCircle.Filled = Environment.FOVSettings.Filled
+            Environment.FOVCircle.NumSides = Environment.FOVSettings.Sides
+            Environment.FOVCircle.Color = GetColor(Environment.FOVSettings.Color)
+            Environment.FOVCircle.Transparency = Environment.FOVSettings.Transparency
+            Environment.FOVCircle.Visible = Environment.FOVSettings.Visible
+            Environment.FOVCircle.Position = Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y)
+        else
+            Environment.FOVCircle.Visible = false
+        end
+
+        if Running and Environment.Settings.Enabled then
+            GetClosestPlayer()
+
+            if Environment.Settings.ThirdPerson then
+                Environment.Settings.ThirdPersonSensitivity = math.clamp(Environment.Settings.ThirdPersonSensitivity, 0.1, 5)
+
+                local Vector = Camera:WorldToViewportPoint(Environment.Locked.Character[Environment.Settings.LockPart].Position)
+                mousemoverel((Vector.X - UserInputService:GetMouseLocation().X) * Environment.Settings.ThirdPersonSensitivity, (Vector.Y - UserInputService:GetMouseLocation().Y) * Environment.Settings.ThirdPersonSensitivity)
+            else
+                if Environment.Settings.Sensitivity > 0 then
+                    Animation = TweenService:Create(Camera, TweenInfo.new(Environment.Settings.Sensitivity, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {CFrame = CFrame.new(Camera.CFrame.Position, Environment.Locked.Character[Environment.Settings.LockPart].Position)})
+                    Animation:Play()
+                else
+                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, Environment.Locked.Character[Environment.Settings.LockPart].Position)
+                end
+            end
+
+            Environment.FOVCircle.Color = GetColor(Environment.FOVSettings.LockedColor)
+        end
+    end)
+
+    ServiceConnections.InputBeganConnection = UserInputService.InputBegan:Connect(function(Input)
+        if not Typing and not changingKeybind then
+            pcall(function()
+                if Input.KeyCode == Enum.KeyCode[Environment.Settings.TriggerKey] then
+                    if Environment.Settings.Toggle then
+                        Running = not Running
+
+                        if not Running then
+                            Environment.Locked = nil
+                            Animation:Cancel()
+                            Environment.FOVCircle.Color = GetColor(Environment.FOVSettings.Color)
+                        end
+                    else
+                        Running = true
+                    end
+                end
+            end)
+
+            pcall(function()
+                if Input.UserInputType == Enum.UserInputType[Environment.Settings.TriggerKey] then
+                    if Environment.Settings.Toggle then
+                        Running = not Running
+
+                        if not Running then
+                            Environment.Locked = nil
+                            Animation:Cancel()
+                            Environment.FOVCircle.Color = GetColor(Environment.FOVSettings.Color)
+                        end
+                    else
+                        Running = true
+                    end
+                end
+            end)
+        end
+    end)
+
+    ServiceConnections.InputEndedConnection = UserInputService.InputEnded:Connect(function(Input)
+        if not Typing and not changingKeybind then
+            pcall(function()
+                if Input.KeyCode == Enum.KeyCode[Environment.Settings.TriggerKey] then
+                    if not Environment.Settings.Toggle then
+                        Running = false
+                        Environment.Locked = nil
+                        Animation:Cancel()
+                        Environment.FOVCircle.Color = GetColor(Environment.FOVSettings.Color)
+                    end
+                end
+            end)
+
+            pcall(function()
+                if Input.UserInputType == Enum.UserInputType[Environment.Settings.TriggerKey] then
+                    if not Environment.Settings.Toggle then
+                        Running = false
+                        Environment.Locked = nil
+                        Animation:Cancel()
+                        Environment.FOVCircle.Color = GetColor(Environment.FOVSettings.Color)
+                    end
+                end
+            end)
+        end
+    end)
+end
+
+--// Functions
+
+Environment.Functions = {}
+
+function Environment.Functions:Exit()
+    SaveSettings()
+
+    for _, v in next, ServiceConnections do
+        v:Disconnect()
+    end
+
+    if Environment.FOVCircle.Remove then Environment.FOVCircle:Remove() end
+
+    getgenv().Aimbot.Functions = nil
+    getgenv().Aimbot = nil
+end
+
+function Environment.Functions:Restart()
+    SaveSettings()
+
+    for _, v in next, ServiceConnections do
+        v:Disconnect()
+    end
+
+    Load()
+end
+
+function Environment.Functions:ResetSettings()
+    Environment.Settings = {
+        SendNotifications = true,
+        SaveSettings = true,
+        ReloadOnTeleport = true,
+        Enabled = true,
+        TeamCheck = false,
+        AliveCheck = true,
+        WallCheck = false,
+        Sensitivity = 0,
+        ThirdPerson = false,
+        ThirdPersonSensitivity = 3,
+        TriggerKey = "MouseButton2",
+        Toggle = false,
+        LockPart = "Head"
+    }
+
+    Environment.FOVSettings = {
+        Enabled = true,
+        Visible = true,
+        Amount = 90,
+        Color = "255, 255, 255",
+        LockedColor = "255, 70, 70",
+        Transparency = 0.5,
+        Sides = 60,
+        Thickness = 1,
+        Filled = false
+    }
+end
+
+--// Support Check
+
+if not Drawing or not getgenv then
+    SendNotification(Title, "Your exploit does not support this script", 3); return
+end
+
+--// Reload On Teleport
+
+if Environment.Settings.ReloadOnTeleport then
+    if queueonteleport then
+        queueonteleport(game:HttpGet("https://raw.githubusercontent.com/Exunys/Aimbot-V2/main/Resources/Scripts/Main.lua"))
+    else
+        SendNotification(Title, "Your exploit does not support \"syn.queue_on_teleport()\"")
+    end
+end
+
+--// Load
+
+Load(); SendNotification(Title, "This Shit Was Made By Cuh", 5)
